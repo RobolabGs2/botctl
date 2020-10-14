@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 
 type Bot struct {
 	Name       string
+	File       string
 	Cmd        string
 	Number     int
 	TotalScore float32
@@ -29,18 +31,44 @@ func (b BotCmd) String() string {
 	return b.Name
 }
 
-func (b BotCmd) Finish() (GameResult, string, error) {
-	score, err := SummarizeGame(b.Wait())
-	if err != nil {
-		return 0, "", err
+func (b BotCmd) WaitChan() chan error {
+	errs := make(chan error)
+	go func() {
+		err := b.Cmd.Wait()
+		select {
+		case errs <- err:
+			break
+		default:
+			break
+		}
+		close(errs)
+	}()
+	return errs
+}
+
+type BotGameResult struct {
+	Error      error
+	GameResult GameResult
+	Bot        *Bot
+}
+
+func (b BotCmd) Finish(ctx context.Context) (GameResult, string, error) {
+	select {
+	case <-ctx.Done():
+		return 0, "", ctx.Err()
+	case res := <-b.WaitChan():
+		score, err := SummarizeGame(res)
+		if err != nil {
+			return 0, "", b.error(err)
+		}
+		switch score {
+		case Win:
+			b.TotalScore++
+		case Draw:
+			b.TotalScore += 0.5
+		}
+		return score, fmt.Sprintf("%s, ходил %s", score, b.Order), nil
 	}
-	switch score {
-	case Win:
-		b.TotalScore++
-	case Draw:
-		b.TotalScore += 0.5
-	}
-	return score, fmt.Sprintf("%s, ходил %s", score, b.Order), nil
 }
 
 func (b Bot) AppendArgs(args []string, order TurnOrder) []string {
@@ -49,8 +77,10 @@ func (b Bot) AppendArgs(args []string, order TurnOrder) []string {
 }
 
 func NewBot(number int, cmd string) (*Bot, error) {
+	filename := filepath.Base(strings.Split(cmd, " ")[0])
 	bot := Bot{
-		Name:   strings.Split(cmd, " ")[0],
+		Name:   strings.TrimSuffix(filename, filepath.Ext(filename)),
+		File:   filename,
 		Cmd:    filepath.Clean(cmd),
 		Number: number,
 	}
@@ -58,7 +88,7 @@ func NewBot(number int, cmd string) (*Bot, error) {
 }
 
 func (b Bot) checkFile() error {
-	if _, err := os.Stat(b.Name); err != nil {
+	if _, err := os.Stat(b.File); err != nil {
 		return b.error(err)
 	}
 	return nil
@@ -66,7 +96,7 @@ func (b Bot) checkFile() error {
 
 func (b Bot) error(err error) error {
 	if err != nil {
-		return fmt.Errorf("проблемы с ботом %d.%s:%w", b.Number, b.Name, err)
+		return fmt.Errorf("проблемы с ботом %d: %s: %w", b.Number, b.Name, err)
 	}
 	return nil
 }

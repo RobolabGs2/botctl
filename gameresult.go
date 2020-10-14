@@ -45,9 +45,9 @@ func SummarizeGame(err error) (GameResult, error) {
 	}
 	if exit := new(exec.ExitError); errors.As(err, &exit) {
 		switch exit.ExitCode() {
-		case 1:
+		case 3:
 			return Lose, nil
-		case 2:
+		case 4:
 			return Draw, nil
 		}
 	}
