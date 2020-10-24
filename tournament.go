@@ -15,6 +15,10 @@ type TournamentSettings struct {
 	Bot1LogCollectorFabric, Bot2LogCollectorFabric LogCollectorFabric
 }
 
+type OnlyWriter struct {
+	io.Writer
+}
+
 type LogCollectorFabric func(round int) io.Writer
 
 func IgnoreLogs(_ int) io.Writer {
@@ -23,7 +27,7 @@ func IgnoreLogs(_ int) io.Writer {
 
 func LogsRedirectTotWriter(writer io.Writer) func(_ int) io.Writer {
 	return func(_ int) io.Writer {
-		return writer
+		return OnlyWriter{writer}
 	}
 }
 
@@ -47,7 +51,7 @@ func (t *Tournament) Run(rounds int) error {
 		t.logger.Println("Раунд", i)
 		res, err := t.Round(i)
 		if err != nil {
-			return err
+			t.logger.Println(err)
 		}
 		t.logger.Println(res)
 	}
@@ -87,7 +91,7 @@ func (t *Tournament) Round(i int) (string, error) {
 	}
 	fmt.Fprintf(t.summary, "%d\t%s\t%s\n", i, score1Desc, score2Desc)
 	if score1+score2 != Draw {
-		return "", fmt.Errorf("конфликт показаний: %s (%s) против %s (%s)", bot1.Name, score1, bot2.Name, score2)
+		return "", fmt.Errorf("раунд %d: конфликт показаний: %s (%s) против %s (%s)", i, bot1.Name, score1, bot2.Name, score2)
 	}
 	if score1 == score2 {
 		return score1.String(), nil

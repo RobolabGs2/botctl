@@ -17,7 +17,8 @@ func main() {
 	if flag.NArg() != 2 {
 		_, _ = fmt.Fprintln(
 			os.Stderr,
-			"Usage:\n  botctl [flags] 'path/to/mybot1.exe [addition args]' 'path/to/mybot2.exe [addition args]'")
+			`Usage:
+botctl [flags] "path/to/mybot1.exe [addition args]" "path/to/mybot2.exe [addition args]"`)
 		flag.PrintDefaults()
 		return
 	}
