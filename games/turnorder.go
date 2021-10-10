@@ -1,12 +1,12 @@
-package main
+package games
 
 import "fmt"
 
-type TurnOrder bool
+type TurnOrder int
 
 const (
-	First  TurnOrder = true
-	Second TurnOrder = false
+	First  TurnOrder = 0
+	Second TurnOrder = 1
 )
 
 func (order TurnOrder) String() string {
@@ -21,5 +21,5 @@ func (order TurnOrder) String() string {
 }
 
 func (order TurnOrder) Opponent() TurnOrder {
-	return !order
+	return 1 - order
 }

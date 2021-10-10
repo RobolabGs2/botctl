@@ -1,4 +1,4 @@
-package main
+package games
 
 import (
 	"errors"
@@ -36,6 +36,19 @@ func (res GameResult) String() string {
 		return "Ничья"
 	default:
 		return strconv.Itoa(int(res))
+	}
+}
+
+func (res GameResult) Score() float64 {
+	switch res {
+	case Win:
+		return 1
+	case Lose:
+		return 0
+	case Draw:
+		return 0.5
+	default:
+		panic("can't get score for unexpected game result " + strconv.Itoa(int(res)))
 	}
 }
 
