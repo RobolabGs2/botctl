@@ -65,13 +65,16 @@ func (b *BotCmd) Finish() (GameResult, error) {
 	return score, nil
 }
 
-func NewBot(cmd string) (Bot, error) {
+func NewBot(cmd string, name ...string) (Bot, error) {
 	path := strings.Split(cmd, " ")[0]
 	filename := filepath.Base(path)
 	bot := Bot{
 		Name: strings.TrimSuffix(filename, filepath.Ext(filename)),
 		File: filename,
 		Cmd:  filepath.Clean(cmd),
+	}
+	if len(name) != 0 {
+		bot.Name = name[0]
 	}
 	return bot, executil.CheckFile(path)
 }

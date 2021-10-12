@@ -4,9 +4,11 @@ package executil
 
 import (
 	"fmt"
+	"io/fs"
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 )
 
 func MakeCmd(args ...string) *exec.Cmd {
@@ -18,6 +20,17 @@ func CheckFile(filename string) error {
 		return err
 	}
 	return nil
+}
+
+func CheckFileFs(fsystem fs.FS, filename string) error {
+	if _, err := fs.Stat(fsystem, filename); err != nil {
+		return err
+	}
+	return nil
+}
+
+func Executable(file fs.DirEntry) bool {
+	return strings.HasSuffix(file.Name(), ".exe")
 }
 
 func KillProcess(cmd *exec.Cmd) error {
