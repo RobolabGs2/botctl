@@ -12,6 +12,7 @@ func main() {
 	cmds := map[string]cli.Command{
 		"duel":       new(commands.DuelConfig),
 		"tournament": new(commands.Tournament),
+		"test":       new(commands.TestBot),
 	}
 	commandName := "duel"
 	helpName := os.Args[0]

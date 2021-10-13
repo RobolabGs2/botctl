@@ -53,7 +53,7 @@ func (d *DuelConfig) Run(args []string, streams cli2.Streams) error {
 		if err != nil {
 			return err
 		}
-		scrapper, err = d.Bot2Logs.GetWriter(i, fmt.Sprintf("%d_%s", 2, bot1.Name), streams)
+		scrapper, err = d.Bot2Logs.GetWriter(i, fmt.Sprintf("%d_%s", 2, bot2.Name), streams)
 		if err == nil {
 			err = battles[i].LogScrapper(1, scrapper)
 		}
