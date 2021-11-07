@@ -1,6 +1,6 @@
 module github.com/RobolabGs2/botctl
 
-go 1.14
+go 1.16
 
 require (
 	github.com/RobolabGs2/flagconfig v0.0.1

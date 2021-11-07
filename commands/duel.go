@@ -5,8 +5,8 @@ import (
 	"sync"
 	"text/tabwriter"
 
-	cli2 "github.com/RobolabGs2/botctl/cli"
-	games2 "github.com/RobolabGs2/botctl/games"
+	"github.com/RobolabGs2/botctl/cli"
+	"github.com/RobolabGs2/botctl/games"
 )
 
 type DuelConfig struct {
@@ -16,33 +16,37 @@ type DuelConfig struct {
 	//Parallel int          `name:"p" default:"1" desc:"Параллельный запуск раундов."` TODO
 }
 
+func (d *DuelConfig) Description() string {
+	return `Дуэль двух ботов с несколькими раундами.`
+}
+
 func (d *DuelConfig) Usage() string {
 	return `"path/to/mybot1.exe [addition args]" "path/to/mybot2.exe [addition args]"`
 }
 
-func (d *DuelConfig) Run(args []string, streams cli2.Streams) error {
+func (d *DuelConfig) Run(args []string, streams cli.Streams) error {
 	if len(args) != 2 {
-		return cli2.IncorrectUsageErr{fmt.Errorf("expected args 2, actual %d", len(args))}
+		return cli.IncorrectUsageErr{fmt.Errorf("expected args 2, actual %d", len(args))}
 	}
-	bot1, err := games2.NewBot(args[0])
+	bot1, err := games.NewBot(args[0])
 	if err != nil {
 		return err
 	}
 	if err := d.Bot1Logs.Prepare(); err != nil {
 		return err
 	}
-	bot2, err := games2.NewBot(args[1])
+	bot2, err := games.NewBot(args[1])
 	if err != nil {
 		return err
 	}
 	if err := d.Bot2Logs.Prepare(); err != nil {
 		return err
 	}
-	battlesQueue := make(chan *games2.Battle, d.Rounds)
-	finishedBattles := make(chan *games2.Battle, d.Rounds)
+	battlesQueue := make(chan *games.Battle, d.Rounds)
+	finishedBattles := make(chan *games.Battle, d.Rounds)
 	runnersGroup := new(sync.WaitGroup)
 	runnersGroup.Add(1)
-	battles := make([]games2.Battle, d.Rounds)
+	battles := make([]games.Battle, d.Rounds)
 	for i := range battles {
 		battles[i].Players[i%2] = bot1
 		battles[i].Players[(i+1)%2] = bot2
@@ -63,17 +67,17 @@ func (d *DuelConfig) Run(args []string, streams cli2.Streams) error {
 		battlesQueue <- &battles[i]
 	}
 	close(battlesQueue)
-	games2.Runner(runnersGroup, battlesQueue, finishedBattles)
+	games.Runner(runnersGroup, battlesQueue, finishedBattles)
 	summary := tabwriter.NewWriter(streams.Out, 0, 4, 4, ' ', 0)
 	_, _ = fmt.Fprintf(summary, "Раунд\t%s\t%s\n", bot1.Cmd, bot2.Cmd)
 	bot1Score := 0.0
 	bot2Score := 0.0
 	for i := range battles {
 		battle := &battles[i]
-		if battle.State() == games2.BattleError {
+		if battle.State() == games.BattleError {
 			return fmt.Errorf("проблемы с раундом %d: %w", i, battle.Err())
 		}
-		if battle.State() != games2.BattleFinished {
+		if battle.State() != games.BattleFinished {
 			panic(fmt.Errorf("unexpected battle state: %s", battle.State()))
 		}
 		first, second := 0, 1
@@ -85,8 +89,8 @@ func (d *DuelConfig) Run(args []string, streams cli2.Streams) error {
 		result2 := battle.GameResult(second)
 		bot2Score += result2.Score()
 		_, _ = fmt.Fprintf(summary, "%d\t%s\t%s\n", i,
-			fmt.Sprintf("%s, ходил %s", result1, games2.TurnOrder(first)),
-			fmt.Sprintf("%s, ходил %s", result2, games2.TurnOrder(second)),
+			fmt.Sprintf("%s, ходил %s", result1, games.TurnOrder(first)),
+			fmt.Sprintf("%s, ходил %s", result2, games.TurnOrder(second)),
 		)
 	}
 	_, _ = fmt.Fprintf(summary, "Итого\t%.1f\t%.1f\n", bot1Score, bot2Score)

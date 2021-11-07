@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	cli2 "github.com/RobolabGs2/botctl/cli"
+	"github.com/RobolabGs2/botctl/cli"
 )
 
 type LogCollector string
@@ -27,7 +27,7 @@ func (v LogCollector) Prepare() error {
 	return os.MkdirAll(string(v), 0666)
 }
 
-func (v LogCollector) GetWriter(round int, botName string, streams cli2.Streams) (io.Writer, error) {
+func (v LogCollector) GetWriter(round int, botName string, streams cli.Streams) (io.Writer, error) {
 	switch v {
 	case "":
 		return nil, nil

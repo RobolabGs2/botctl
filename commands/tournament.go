@@ -16,7 +16,23 @@ import (
 )
 
 type Tournament struct {
-	Concurrency int `name:"c" default:"0" desc:"Количество одновременных соревнований. '0' - количество виртуальных ядер минус 1"`
+	Concurrency int    `name:"c" default:"0" desc:"Количество одновременных соревнований. '0' - количество виртуальных ядер минус 1"`
+	BotsList    string `name:"config" default:"tournament.yaml" desc:"A ботов для турнира"`
+}
+
+func (t *Tournament) Description() string {
+	return `Запускает турнир всех со всеми, ведя турнирную таблицу.
+Берёт список ботов из файла, задаваемого флагом -config.
+В файле ожидается словарь в формате yaml, ключи которого будут использоваться в качестве
+имён ботов, а значениями должны быть настройки (пока настройка только одна - команда запуска бота):
+
+first bot: # имя бота или его автора
+	cmd: bot1.exe # команда запуска без последнего аргумента - номера хода
+Студент Студентович Студентов:
+	cmd: bot2.exe
+first bot with args:
+	cmd: bot1.exe -d 42
+`
 }
 
 func (t *Tournament) Run(args []string, streams cli.Streams) error {
@@ -50,8 +66,13 @@ func (t *Tournament) Run(args []string, streams cli.Streams) error {
 	scores := MakeScoreTable(botsDesc)
 	output := log.New(streams.Out, "", 0)
 	for battle := range RunRunners(t.Concurrency, battles) {
-		scores.Update(battle)
-		log.Println(battle.State(), battle.Players[0].Name, battle.GameResult(0), battle.Players[1].Name, battle.GameResult(1))
+		err := scores.Update(battle)
+		if err != nil {
+			return err
+		}
+		log.Println(battle.State(),
+			battle.Players[0].Name, battle.GameResult(0),
+			battle.Players[1].Name, battle.GameResult(1))
 		output.Println(scores)
 	}
 	return nil
@@ -71,8 +92,8 @@ func MakeBots(botsDesc []BotDescription, dirName string) ([]games.Bot, error) {
 
 func (t *Tournament) readBotDescriptions(dir fs.FS) ([]BotDescription, error) {
 	var botsDesc []BotDescription
-	if executil.CheckFileFs(dir, "tournament.yaml") == nil {
-		config, err := dir.Open("tournament.yaml")
+	if executil.CheckFileFs(dir, t.BotsList) == nil {
+		config, err := dir.Open(t.BotsList)
 		if err != nil {
 			return nil, err
 		}
@@ -121,8 +142,8 @@ func RunRunners(concurrency int, battles chan *games.Battle) chan *games.Battle 
 	return finished
 }
 
-func (t *Tournament) Usage() string {
-	return "Турнир"
+func (t Tournament) Usage() string {
+	return "[folder/with/bots]"
 }
 
 type BotDescription struct {

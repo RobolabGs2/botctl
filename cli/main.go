@@ -14,6 +14,7 @@ import (
 type Command interface {
 	Run(args []string, streams Streams) error
 	Usage() string
+	Description() string
 }
 
 type Streams struct {
@@ -60,7 +61,8 @@ func RunCommand(name string, cmd Command, streams Streams, args []string) error 
 }
 
 func PrintUsage(name string, cmd Command, writer io.Writer, flags *flag.FlagSet) {
-	_, _ = fmt.Fprintf(writer, "Usage:\n %s [flags] %s\n", name, cmd.Usage())
+	_, _ = fmt.Fprintln(writer, cmd.Usage())
+	_, _ = fmt.Fprintf(writer, "использование:\n %s [flags] %s\n", name, cmd.Usage())
 	flags.SetOutput(writer)
 	flags.PrintDefaults()
 }

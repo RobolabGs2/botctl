@@ -36,8 +36,7 @@ func (t ScoreTable) Update(battle *games.Battle) error {
 
 func (t ScoreTable) String() string {
 	buf := bytes.Buffer{}
-	_, err := t.WriteTo(&buf)
-	if err != nil {
+	if _, err := t.WriteTo(&buf); err != nil {
 		panic(fmt.Errorf("can't stringlify score table: %w", err))
 	}
 	return buf.String()
