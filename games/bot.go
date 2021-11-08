@@ -21,6 +21,7 @@ type BotCmd struct {
 	*exec.Cmd
 	mut      sync.Mutex
 	finished bool
+	ctxError error
 	exitCode error
 	wait     chan struct{}
 }
@@ -37,7 +38,8 @@ func (b *BotCmd) Start(ctx context.Context) error {
 		b.mut.Lock()
 		defer b.mut.Unlock()
 		if !b.finished {
-			log.Println("KILLING PROCESS", ctx.Err())
+			log.Println("KILL PROCESS", b.String(), ctx.Err())
+			b.ctxError = ctx.Err()
 			_ = executil.KillProcess(b.Cmd)
 		}
 	}()
@@ -54,6 +56,9 @@ func (b *BotCmd) Start(ctx context.Context) error {
 
 func (b *BotCmd) Wait() error {
 	<-b.wait // после чтения из канала гарантированно всё изменено как надо
+	if b.ctxError != nil {
+		return b.ctxError
+	}
 	return b.exitCode
 }
 
