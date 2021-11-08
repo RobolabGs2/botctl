@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"sync"
+	"time"
 )
 
 type BattleState int
@@ -31,7 +32,13 @@ type Battle struct {
 	scores   [2]GameResult
 	logs     [2]Buffer
 
-	Players [2]Bot
+	Players    [2]Bot
+	StartedAt  time.Time
+	FinishedAt time.Time
+}
+
+func (b *Battle) Duration() time.Duration {
+	return b.FinishedAt.Sub(b.StartedAt)
 }
 
 func (battle *Battle) Logs(player int) string {
@@ -91,7 +98,13 @@ func (b *Buffer) ReadAll() string {
 func (battle *Battle) Run(ctx context.Context) (err error) {
 	battle.stateMut.Lock()
 	battle.state = BattleRunning
+	battle.StartedAt = time.Now()
 	battle.stateMut.Unlock()
+	defer func() {
+		battle.stateMut.Lock()
+		battle.FinishedAt = time.Now()
+		battle.stateMut.Unlock()
+	}()
 	defer func() {
 		if err != nil {
 			battle.stateMut.Lock()

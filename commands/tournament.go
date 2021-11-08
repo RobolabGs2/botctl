@@ -2,22 +2,23 @@ package commands
 
 import (
 	"errors"
+	"github.com/RobolabGs2/botctl/cli"
+	"github.com/RobolabGs2/botctl/executil"
+	"github.com/RobolabGs2/botctl/games"
+	"gopkg.in/yaml.v3"
 	"io/fs"
 	"log"
 	"os"
 	"path"
 	"runtime"
 	"sync"
-
-	"github.com/RobolabGs2/botctl/cli"
-	"github.com/RobolabGs2/botctl/executil"
-	"github.com/RobolabGs2/botctl/games"
-	"gopkg.in/yaml.v3"
+	"time"
 )
 
 type Tournament struct {
 	Concurrency int    `name:"c" default:"0" desc:"Количество одновременных соревнований. '0' - количество виртуальных ядер минус 1"`
-	BotsList    string `name:"config" default:"tournament.yaml" desc:"A ботов для турнира"`
+	Config      string `name:"config" default:"tournament.yaml" desc:"Список ботов для турнира"`
+	config      TournamentConfigs
 }
 
 func (t *Tournament) Description() string {
@@ -52,6 +53,11 @@ func (t *Tournament) Run(args []string, streams cli.Streams) error {
 	if err != nil {
 		return err
 	}
+	testBots(bots, streams, t.Concurrency)
+	return runTournament(bots, botsDesc, streams, t.Concurrency)
+}
+
+func runTournament(bots []games.Bot, botsDesc []BotDescription, streams cli.Streams, concurrency int) error {
 	battles := make(chan *games.Battle)
 	go func() {
 		for i, first := range bots {
@@ -65,15 +71,37 @@ func (t *Tournament) Run(args []string, streams cli.Streams) error {
 
 	scores := MakeScoreTable(botsDesc)
 	output := log.New(streams.Out, "", 0)
-	for battle := range RunRunners(t.Concurrency, battles) {
+	for battle := range RunRunners(concurrency, battles) {
 		err := scores.Update(battle)
 		if err != nil {
-			return err
+			output.Printf(
+				"Неудачное сражение между %s vs %s: %s",
+				battle.Players[0].Name, battle.Players[1].Name, err)
+			continue
 		}
-		log.Println(battle.State(),
+		output.Println(scores)
+		output.Println(battle.State(),
 			battle.Players[0].Name, battle.GameResult(0),
 			battle.Players[1].Name, battle.GameResult(1))
-		output.Println(scores)
+		output.Println()
+	}
+	return nil
+}
+
+func testBots(bots []games.Bot, streams cli.Streams, concurrency int) error {
+	battles := make(chan *games.Battle)
+	go func() {
+		for _, bot := range bots {
+			battles <- &games.Battle{Players: [2]games.Bot{bot, bot}}
+		}
+		close(battles)
+	}()
+
+	output := log.New(streams.Out, "", 0)
+	for battle := range RunRunners(concurrency, battles) {
+		output.Println("Результат тестирования бота", battle.Players[0].Name)
+		_ = analizeTestBattle(output, streams, battle)
+		output.Println()
 	}
 	return nil
 }
@@ -90,34 +118,47 @@ func MakeBots(botsDesc []BotDescription, dirName string) ([]games.Bot, error) {
 	return bots, nil
 }
 
+type BotsConfig map[string]BotDescription
+
+func (bots BotsConfig) Slice() []BotDescription {
+	botsDesc := make([]BotDescription, 0, len(bots))
+	for author, bot := range bots {
+		bot.Author = author
+		botsDesc = append(botsDesc, bot)
+	}
+	return botsDesc
+}
+
+type TournamentConfigs struct {
+	Bots    BotsConfig
+	Timeout time.Duration
+	Game    string
+	Rounds  int
+}
+
 func (t *Tournament) readBotDescriptions(dir fs.FS) ([]BotDescription, error) {
+	if executil.CheckFileFs(dir, t.Config) == nil {
+		config, err := dir.Open(t.Config)
+		if err != nil {
+			return nil, err
+		}
+		if err := yaml.NewDecoder(config).Decode(&t.config); err != nil {
+			return nil, err
+		}
+		return t.config.Bots.Slice(), nil
+	}
 	var botsDesc []BotDescription
-	if executil.CheckFileFs(dir, t.BotsList) == nil {
-		config, err := dir.Open(t.BotsList)
-		if err != nil {
-			return nil, err
-		}
-		bots := map[string]BotDescription{}
-		if err := yaml.NewDecoder(config).Decode(bots); err != nil {
-			return nil, err
-		}
-		for author, bot := range bots {
-			bot.Author = author
-			botsDesc = append(botsDesc, bot)
-		}
-	} else {
-		files, err := fs.ReadDir(dir, ".")
-		if err != nil {
-			return nil, err
-		}
-		for _, file := range files {
-			if executil.Executable(file) {
-				log.Println("Detect bot", file.Name())
-				botsDesc = append(botsDesc, BotDescription{
-					Author: file.Name(),
-					Cmd:    file.Name(),
-				})
-			}
+	files, err := fs.ReadDir(dir, ".")
+	if err != nil {
+		return nil, err
+	}
+	for _, file := range files {
+		if executil.Executable(file) {
+			log.Println("Detect bot", file.Name())
+			botsDesc = append(botsDesc, BotDescription{
+				Author: file.Name(),
+				Cmd:    file.Name(),
+			})
 		}
 	}
 	return botsDesc, nil
@@ -133,7 +174,7 @@ func RunRunners(concurrency int, battles chan *games.Battle) chan *games.Battle 
 	runnersGroup.Add(concurrency)
 	finished := make(chan *games.Battle)
 	for i := 0; i < concurrency; i++ {
-		go games.Runner(runnersGroup, battles, finished)
+		go games.RunnerWithTimeout(2*time.Minute, runnersGroup, battles, finished)
 	}
 	go func() {
 		runnersGroup.Wait()

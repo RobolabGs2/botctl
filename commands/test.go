@@ -55,9 +55,14 @@ func (d *TestBot) Run(args []string, streams cli.Streams) error {
 		return err
 	}
 	timeout, cancelFunc := context.WithTimeout(context.Background(), d.Timeout)
-	err = battle.Run(timeout)
+	_ = battle.Run(timeout)
 	cancelFunc()
 	output := log.New(streams.Out, "", 0)
+	return analizeTestBattle(output, streams, &battle)
+}
+
+func analizeTestBattle(output *log.Logger, streams cli.Streams, battle *games.Battle) error {
+	err := battle.Err()
 	if err != nil {
 		if conflict := new(games.ConflictScore); errors.As(err, &conflict) {
 			output.Printf(`Либо бот упал с ошибкой, либо он некорректно возвращает результат игры.
@@ -66,15 +71,16 @@ Exit code должен быть: победа - 0, поражение - 3, ни�
 `, conflict.Scores[0].String(), conflict.Scores[1].String())
 			return err
 		}
-		if errors.Is(timeout.Err(), context.DeadlineExceeded) {
+		if errors.Is(err, context.DeadlineExceeded) {
 			output.Println("Бот слишком долго играл, возможно, завис")
-			return timeout.Err()
+			return err
 		}
 		_, _ = fmt.Fprintln(streams.Out, "Проблемы с ботом", err)
 		return err
 	}
 	_, _ = fmt.Fprintf(streams.Out, `Тестирование прошло успешно, бот способен играть сам с собой.
+Длительность партии: %s.
 Результат ходившего первым: %s
-`, battle.GameResult(0))
+`, battle.Duration(), battle.GameResult(0))
 	return nil
 }

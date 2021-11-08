@@ -1,14 +1,17 @@
+//go:build windows
 // +build windows
 
 package executil
 
 import (
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 func MakeCmd(args ...string) *exec.Cmd {
@@ -17,6 +20,9 @@ func MakeCmd(args ...string) *exec.Cmd {
 
 func CheckFile(filename string) error {
 	if _, err := os.Stat(filename); err != nil {
+		if errors.Is(err, syscall.ERROR_FILE_NOT_FOUND) {
+			return fmt.Errorf("файл %q не найден", filename)
+		}
 		return err
 	}
 	return nil
